@@ -1,40 +1,13 @@
-/*
- * This example turns the ESP32 into a Bluetooth LE gamepad that presses buttons and moves axis
- *
- * At the moment we are using the default settings, but they can be canged using a BleGamepadConfig instance as parameter for the begin function.
- *
- * Possible buttons are:
- * BUTTON_1 through to BUTTON_16
- * (16 buttons by default. Library can be configured to use up to 128)
- *
- * Possible DPAD/HAT switch position values are:
- * DPAD_CENTERED, DPAD_UP, DPAD_UP_RIGHT, DPAD_RIGHT, DPAD_DOWN_RIGHT, DPAD_DOWN, DPAD_DOWN_LEFT, DPAD_LEFT, DPAD_UP_LEFT
- * (or HAT_CENTERED, HAT_UP etc)
- *
- * bleGamepad.setAxes sets all axes at once. There are a few:
- * (x axis, y axis, z axis, rx axis, ry axis, rz axis, slider 1, slider 2)
- *
- * Library can also be configured to support up to 5 simulation controls
- * (rudder, throttle, accelerator, brake, steering), but they are not enabled by default.
- *
- * Library can also be configured to support different function buttons
- * (start, select, menu, home, back, volume increase, volume decrease, volume mute)
- * start and select are enabled by default
- */
+#include <BleKeyboard.h>
+BleKeyboard bleKeyboard("Shapeoko Pendant Keyboard");
 
 #include <Arduino.h>
-#include <BleGamepad.h>
-//#include <Wire.h>
-//#include <Adafruit_I2CDevice.h>
 #include <SPI.h>
-//#include "Adafruit_seesaw.h"
-
-BleGamepad bleGamepad("Shapeoko Pendant");
 
 #include "Adafruit_seesaw.h"
 
 // This can be enabled to get extra logging about the position of the controller relative to the correction values
-//#define JOY_CALIBRATION_MODE
+// #define JOY_CALIBRATION_MODE
 
 // This sketch requires that one of the optional interrupt pins on the Joy Featherwing is soldered. This value should match the
 // complimentary GPIO pin on the ESP device. See: https://learn.adafruit.com/joy-featherwing/pinouts
@@ -53,9 +26,9 @@ Adafruit_seesaw ss;
 #define STICK_H 3
 #define STICK_V 2
 
-// When the analog stick is moved and returns to its center point there may be a deviation from the true center of 512. A calibration will 
-// occur when the analog stick read task begins. Even after this calibration there may be some drift on the stick that can make determining 
-// the center point error prone. In order to compensate for this, values can be specified to determine a reasonable center point. If you have 
+// When the analog stick is moved and returns to its center point there may be a deviation from the true center of 512. A calibration will
+// occur when the analog stick read task begins. Even after this calibration there may be some drift on the stick that can make determining
+// the center point error prone. In order to compensate for this, values can be specified to determine a reasonable center point. If you have
 // a use case where you don't care about drift or the center point of the stick, this can all be ignored entirely.
 #ifndef STICK_CENTER_POINT
 #define STICK_CENTER_POINT 512 // Analog stick will read 0...1024 along each axis
@@ -72,6 +45,7 @@ Adafruit_seesaw ss;
 #ifndef STICK_D_CORRECTION
 #define STICK_D_CORRECTION -20
 #endif
+#define D_THRESHOLD 200;
 
 // Every time the analog values are read they will be slightly different. In order
 // to only detect movement when the stick is actually moved, these values can tune
@@ -106,7 +80,6 @@ void IRAM_ATTR onButtonPress()
     }
 }
 
-
 // Queue consumer for responding to button presses
 void buttonPressConsumer(void *)
 {
@@ -119,8 +92,6 @@ void buttonPressConsumer(void *)
         xQueueReceive(buttonPressQueue, &p, portMAX_DELAY);
         xSemaphoreTake(i2cSem, portMAX_DELAY);
         uint32_t v = ss.digitalReadBulk(button_mask);
-
-
 
         // Debounce by discarding duplicate reads
         if (lastValue != v)
@@ -136,15 +107,14 @@ void buttonPressConsumer(void *)
                 if (!(v & (1 << BUTTON_DOWN)))
                 {
                     Serial.println("\t\tBUTTON_DOWN pressed");
-                    bleGamepad.press(BUTTON_Z_DOWN);
+                    bleKeyboard.press(KEY_PAGE_DOWN);
                 }
-                else 
+                else
                 {
                     Serial.println("\t\tBUTTON_DOWN released");
-                    bleGamepad.release(BUTTON_Z_DOWN);
+                    bleKeyboard.release(KEY_PAGE_DOWN);
                 }
             }
-
 
             // Z Up
             oldV = lastValue & (1 << BUTTON_UP);
@@ -155,12 +125,12 @@ void buttonPressConsumer(void *)
                 if (!(v & (1 << BUTTON_UP)))
                 {
                     Serial.println("\t\tBUTTON_UP pressed");
-                    bleGamepad.press(BUTTON_Z_UP);
+                    bleKeyboard.press(KEY_PAGE_UP);
                 }
-                else 
+                else
                 {
                     Serial.println("\t\tBUTTON_UPreleased");
-                    bleGamepad.release(BUTTON_Z_UP);
+                    bleKeyboard.release(KEY_PAGE_UP);
                 }
             }
 
@@ -169,35 +139,34 @@ void buttonPressConsumer(void *)
             newV = v & (1 << BUTTON_RIGHT);
             if (oldV != newV)
             {
-                Serial.println("\tBUTTON_RIGHT changed");
+                // Serial.println("\tBUTTON_RIGHT changed");
                 if (!(v & (1 << BUTTON_RIGHT)))
                 {
-                    Serial.println("\t\tBUTTON_RIGHT pressed");
-                    bleGamepad.press(BUTTON_FASTER);
+                    // Serial.println("\t\tBUTTON_RIGHT pressed");
+                    bleKeyboard.print("4");
                 }
-                else 
+                else
                 {
-                    Serial.println("\t\tBUTTON_RIGHT released");
-                    bleGamepad.release(BUTTON_FASTER);
+                    // Serial.println("\t\tBUTTON_RIGHT released");
+                    bleKeyboard.releaseAll(); // (KEY_NUM_4);
                 }
             }
 
-
-            // Z Up
+            // Slow
             oldV = lastValue & (1 << BUTTON_LEFT);
             newV = v & (1 << BUTTON_LEFT);
             if (oldV != newV)
             {
-                Serial.println("\tBUTTON_LEFT changed");
+                // Serial.println("\tBUTTON_LEFT changed");
                 if (!(v & (1 << BUTTON_LEFT)))
                 {
-                    Serial.println("\t\tBUTTON_LEFT pressed");
-                    bleGamepad.press(BUTTON_SLOWER);
+                    // Serial.println("\t\tBUTTON_LEFT pressed");
+                    bleKeyboard.print("3");
                 }
-                else 
+                else
                 {
-                    Serial.println("\t\tBUTTON_LEFT");
-                    bleGamepad.release(BUTTON_SLOWER);
+                    // Serial.println("\t\tBUTTON_LEFT");
+                    bleKeyboard.releaseAll(); //(KEY_NUM_3);
                 }
             }
 
@@ -210,9 +179,20 @@ void buttonPressConsumer(void *)
     vTaskDelete(NULL);
 }
 
+enum JoyPosition
+{
+    Center = 0,
+    Up = 1,
+    Down = 2,
+    Left = 3,
+    Right = 4
+};
+
 void analogStickTask(void *)
 {
     Serial.println(F("analogStickTask() begin"));
+
+    bleKeyboard.releaseAll();
 
     int16_t x_ctr, y_ctr;
     xSemaphoreTake(i2cSem, portMAX_DELAY);
@@ -220,8 +200,13 @@ void analogStickTask(void *)
     y_ctr = ss.analogRead(STICK_V);
     xSemaphoreGive(i2cSem);
 
-
-    
+    bool wasLeft = false;
+    bool wasRight = false;
+    bool wasUp = false;
+    bool wasDown = false;
+    bool wasCenter = true;
+    JoyPosition position = Center;
+    bleKeyboard.releaseAll();
 
     int16_t x = -1;
     int16_t y = -1;
@@ -241,7 +226,6 @@ void analogStickTask(void *)
             new_y >= y + MIN_STICK_V_MOVE)
         {
 
-
             // Make a best effort guess as to if the stick is centered or not based on
             // initial calibration and corrections
             isCentered = x_ctr >= max(0, new_x + STICK_L_CORRECTION) &&
@@ -250,46 +234,127 @@ void analogStickTask(void *)
                          y_ctr >= max(0, new_y + STICK_D_CORRECTION);
 
             // Ensure value is always 0...1024 and account for any corrections and/or calibrations to prevent over/underflows
-            x = new_x < 0 ? 0 : new_x > 1024 ? 1024  : new_x;
-            y = new_y < 0 ? 0 : new_y > 1024 ? 1024  : new_y;
+            x = new_x < 0 ? 0 : new_x > 1024 ? 1024
+                                             : new_x;
+            y = new_y < 0 ? 0 : new_y > 1024 ? 1024
+                                             : new_y;
 
-            int pad_x = 32767 / 1024 * x;
-            int pad_y = 32767 / 1024 * y;
+            bool isLeft = x < STICK_CENTER_POINT - D_THRESHOLD;
+            bool isRight = x > STICK_CENTER_POINT + D_THRESHOLD;
+            bool isUp = y < STICK_CENTER_POINT - D_THRESHOLD;
+            bool isDown = y > STICK_CENTER_POINT + D_THRESHOLD;
 
             // Log the position of the analog stick in various ways for different kinds of application
-            Serial.printf("Analog stick position change!\n\tIs centered: %s\n\tPosition: X=%d Y=%d\n\tPAD: X=%d Y=%d\n",
+            Serial.printf("Analog stick position change!\n\tIs centered: %s\n\tPosition: X=%d Y=%d\n",
                           isCentered ? "true" : "false",
-                          x, y, pad_x, pad_y);
+                          x, y);
 
+            JoyPosition newPosition = Center;
+            if (isCentered)
+                newPosition = Center;
+            if (isLeft)
+                newPosition = Left;
+            else if (isRight)
+                newPosition = Right;
+            else if (isUp)
+                newPosition = Up;
+            else if (isDown)
+                newPosition = Down;
 
+            if (position != newPosition)
+            {
+                bleKeyboard.releaseAll();
+                if (isLeft)
+                {
+                    bleKeyboard.press(KEY_LEFT_ARROW);
+                    Serial.println("Left");
+                }
+                else if (isRight)
+                {
+                    bleKeyboard.press(KEY_RIGHT_ARROW);
+                    Serial.println("Right");
+                }
+                else if (isUp)
+                {
+                    bleKeyboard.press(KEY_UP_ARROW);
+                    Serial.println("Up");
+                }
+                else if (isDown)
+                {
+                    bleKeyboard.press(KEY_DOWN_ARROW);
+                    Serial.println("Down");
+                }
+                else
+                {
+                    Serial.println("Center");
+                }
+                position = newPosition;
+            }
+            /*
+                        if (isCentered && !wasCenter)
+                        {
+                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
+                            bleKeyboard.releaseAll();
+                            Serial.println("Center");
+                            wasCenter = true;
+                        }
 
-            bleGamepad.setAxes(pad_x, pad_y, 0,0,0,0,0,0);
+                        else if (isLeft && !wasLeft)
+                        {
+                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
+                            bleKeyboard.releaseAll();
+                            bleKeyboard.press(KEY_LEFT_ARROW);
+                            Serial.println("Left");
+                            wasLeft = true;
+                        }
 
-            //bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
+                        else if (isRight && !wasRight)
+                        {
+                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
+                            bleKeyboard.releaseAll();
+                            bleKeyboard.press(KEY_RIGHT_ARROW);
+                            Serial.println("Right");
+                            wasRight = true;
+                        }
+
+                        else if (isUp && !wasUp)
+                        {
+                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
+                            bleKeyboard.releaseAll();
+                            bleKeyboard.press(KEY_UP_ARROW);
+                            Serial.println("Up");
+                            wasUp = true;
+                        }
+
+                        else if (isDown && !wasDown)
+                        {
+                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
+                            bleKeyboard.releaseAll();
+                            bleKeyboard.press(KEY_DOWN_ARROW);
+                            Serial.println("Down");
+                            wasDown = true;
+                        }
+            */
+
+            // bleGamepad.setAxes(pad_x, pad_y, 0,0,0,0,0,0);
+
+            // bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
         }
 
-        // Tune this to be quick enough to read the controller position in a reasonable amount of time but not so fast that it 
+        // Tune this to be quick enough to read the controller position in a reasonable amount of time but not so fast that it
         // saturates the I2C bus and delays or blocks other operations.
         delay(100);
-           // bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
-
+        // bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
     }
 
     vTaskDelete(NULL);
 }
 
-
-
 void setup()
 {
     Serial.begin(115200);
 
-
-    Serial.println("Starting BLE work!");
-    bleGamepad.begin();
-
-
-      Serial.println("Joy FeatherWing example!");
+    bleKeyboard.begin();
 
     if (!ss.begin(0x49))
     {
@@ -298,12 +363,6 @@ void setup()
         {
             delay(1);
         }
-    }
-    else
-    {
-        Serial.println("seesaw started");
-        Serial.print("version: ");
-        Serial.println(ss.getVersion(), HEX);
     }
 
     ss.pinModeBulk(button_mask, INPUT_PULLUP);
@@ -333,40 +392,9 @@ void setup()
 
     // Respond to changes from button presses
     attachInterrupt(IRQ_PIN, onButtonPress, FALLING);
-/*
-    Serial.println("JoyWing");
-    joy.begin();
-    Serial.println("JoyWing started");
-    joy.registerJoystickCallback(joystickCallback);
-    Serial.println("JoyWing stick");
-    joy.registerButtonCallback(buttonCallback);
-    Serial.println("JoyWing buttons");
-*/
-    // The default bleGamepad.begin() above enables 16 buttons, all axes, one hat, and no simulation controls or special buttons
 }
 
 void loop()
 {
-    /*
-    if (bleGamepad.isConnected())
-    {
-        Serial.println("Press buttons 5, 16 and start. Move all enabled axes to max. Set DPAD (hat 1) to down right.");
-        bleGamepad.press(BUTTON_5);
-        bleGamepad.press(BUTTON_16);
-        bleGamepad.pressStart();
-        bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
-        bleGamepad.setHat1(HAT_DOWN_RIGHT);
-        // All axes, sliders, hats etc can also be set independently. See the IndividualAxes.ino example
-        delay(500);
-
-        Serial.println("Release button 5 and start. Move all axes to min. Set DPAD (hat 1) to centred.");
-        bleGamepad.release(BUTTON_5);
-        bleGamepad.releaseStart();
-        bleGamepad.setHat1(HAT_CENTERED);
-        bleGamepad.setAxes(0, 0, 0, 0, 0, 0, 0, 0);
-        delay(500);
-    }
-    */
-   //joy.update();
-   delay(500);
+    delay(500);
 }
