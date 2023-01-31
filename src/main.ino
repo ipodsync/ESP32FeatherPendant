@@ -93,10 +93,12 @@ void buttonPressConsumer(void *)
         xSemaphoreTake(i2cSem, portMAX_DELAY);
         uint32_t v = ss.digitalReadBulk(button_mask);
 
+
         // Debounce by discarding duplicate reads
         if (lastValue != v)
         {
             Serial.println("Buttons changed");
+            bleKeyboard.releaseAll();
 
             // Z Down
             int oldV = lastValue & (1 << BUTTON_DOWN);
@@ -112,7 +114,7 @@ void buttonPressConsumer(void *)
                 else
                 {
                     Serial.println("\t\tBUTTON_DOWN released");
-                    bleKeyboard.release(KEY_PAGE_DOWN);
+                    //bleKeyboard.releaseAll();
                 }
             }
 
@@ -130,7 +132,7 @@ void buttonPressConsumer(void *)
                 else
                 {
                     Serial.println("\t\tBUTTON_UPreleased");
-                    bleKeyboard.release(KEY_PAGE_UP);
+                    //bleKeyboard.releaseAll();
                 }
             }
 
@@ -142,13 +144,13 @@ void buttonPressConsumer(void *)
                 // Serial.println("\tBUTTON_RIGHT changed");
                 if (!(v & (1 << BUTTON_RIGHT)))
                 {
-                    // Serial.println("\t\tBUTTON_RIGHT pressed");
+                    Serial.println("\t\tBUTTON_RIGHT pressed");
                     bleKeyboard.print("4");
                 }
                 else
                 {
                     // Serial.println("\t\tBUTTON_RIGHT released");
-                    bleKeyboard.releaseAll(); // (KEY_NUM_4);
+                    //bleKeyboard.releaseAll(); // (KEY_NUM_4);
                 }
             }
 
@@ -160,13 +162,13 @@ void buttonPressConsumer(void *)
                 // Serial.println("\tBUTTON_LEFT changed");
                 if (!(v & (1 << BUTTON_LEFT)))
                 {
-                    // Serial.println("\t\tBUTTON_LEFT pressed");
+                     Serial.println("\t\tBUTTON_LEFT pressed");
                     bleKeyboard.print("3");
                 }
                 else
                 {
                     // Serial.println("\t\tBUTTON_LEFT");
-                    bleKeyboard.releaseAll(); //(KEY_NUM_3);
+                    //bleKeyboard.releaseAll(); //(KEY_NUM_3);
                 }
             }
 
