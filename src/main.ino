@@ -63,6 +63,9 @@ Adafruit_seesaw ss;
 #define BUTTON_FASTER BUTTON_3
 #define BUTTON_SLOWER BUTTON_4
 
+const int MAX_ANALOG_VAL = 4095;
+const float MAX_BATTERY_VOLTAGE = 4.2; // Max LiPoly voltage of a 3.7 battery is 4.2
+
 uint32_t button_mask = (1 << BUTTON_RIGHT) | (1 << BUTTON_DOWN) |
                        (1 << BUTTON_LEFT) | (1 << BUTTON_UP) | (1 << BUTTON_SEL);
 
@@ -93,7 +96,6 @@ void buttonPressConsumer(void *)
         xSemaphoreTake(i2cSem, portMAX_DELAY);
         uint32_t v = ss.digitalReadBulk(button_mask);
 
-
         // Debounce by discarding duplicate reads
         if (lastValue != v)
         {
@@ -114,7 +116,7 @@ void buttonPressConsumer(void *)
                 else
                 {
                     Serial.println("\t\tBUTTON_DOWN released");
-                    //bleKeyboard.releaseAll();
+                    // bleKeyboard.releaseAll();
                 }
             }
 
@@ -132,7 +134,7 @@ void buttonPressConsumer(void *)
                 else
                 {
                     Serial.println("\t\tBUTTON_UPreleased");
-                    //bleKeyboard.releaseAll();
+                    // bleKeyboard.releaseAll();
                 }
             }
 
@@ -150,7 +152,7 @@ void buttonPressConsumer(void *)
                 else
                 {
                     // Serial.println("\t\tBUTTON_RIGHT released");
-                    //bleKeyboard.releaseAll(); // (KEY_NUM_4);
+                    // bleKeyboard.releaseAll(); // (KEY_NUM_4);
                 }
             }
 
@@ -162,13 +164,13 @@ void buttonPressConsumer(void *)
                 // Serial.println("\tBUTTON_LEFT changed");
                 if (!(v & (1 << BUTTON_LEFT)))
                 {
-                     Serial.println("\t\tBUTTON_LEFT pressed");
+                    Serial.println("\t\tBUTTON_LEFT pressed");
                     bleKeyboard.print("3");
                 }
                 else
                 {
                     // Serial.println("\t\tBUTTON_LEFT");
-                    //bleKeyboard.releaseAll(); //(KEY_NUM_3);
+                    // bleKeyboard.releaseAll(); //(KEY_NUM_3);
                 }
             }
 
@@ -291,62 +293,12 @@ void analogStickTask(void *)
                     Serial.println("Center");
                 }
                 position = newPosition;
+
+                UpdateBatteryPercent();
             }
-            /*
-                        if (isCentered && !wasCenter)
-                        {
-                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
-                            bleKeyboard.releaseAll();
-                            Serial.println("Center");
-                            wasCenter = true;
-                        }
-
-                        else if (isLeft && !wasLeft)
-                        {
-                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
-                            bleKeyboard.releaseAll();
-                            bleKeyboard.press(KEY_LEFT_ARROW);
-                            Serial.println("Left");
-                            wasLeft = true;
-                        }
-
-                        else if (isRight && !wasRight)
-                        {
-                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
-                            bleKeyboard.releaseAll();
-                            bleKeyboard.press(KEY_RIGHT_ARROW);
-                            Serial.println("Right");
-                            wasRight = true;
-                        }
-
-                        else if (isUp && !wasUp)
-                        {
-                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
-                            bleKeyboard.releaseAll();
-                            bleKeyboard.press(KEY_UP_ARROW);
-                            Serial.println("Up");
-                            wasUp = true;
-                        }
-
-                        else if (isDown && !wasDown)
-                        {
-                            wasUp = wasDown = wasLeft = wasRight = wasCenter = false;
-                            bleKeyboard.releaseAll();
-                            bleKeyboard.press(KEY_DOWN_ARROW);
-                            Serial.println("Down");
-                            wasDown = true;
-                        }
-            */
-
-            // bleGamepad.setAxes(pad_x, pad_y, 0,0,0,0,0,0);
-
-            // bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
         }
 
-        // Tune this to be quick enough to read the controller position in a reasonable amount of time but not so fast that it
-        // saturates the I2C bus and delays or blocks other operations.
         delay(100);
-        // bleGamepad.setAxes(32767, 32767, 32767, 32767, 32767, 32767, 32767, 32767);
     }
 
     vTaskDelete(NULL);
@@ -398,5 +350,19 @@ void setup()
 
 void loop()
 {
-    delay(500);
+    delay(1000);
+}
+
+void UpdateBatteryPercent()
+{
+    int rawValue = analogRead(A13);
+
+    // Reference voltage on ESP32 is 1.1V
+    // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/adc.html#adc-calibration
+    // See also: https://bit.ly/2zFzfMT
+    float voltageLevel = (rawValue / 4095.0) * 2 * 1.1 * 3.3; // calculate voltage level
+    float batteryFraction = voltageLevel / MAX_BATTERY_VOLTAGE;
+
+    Serial.println((String) "Raw:" + rawValue + " Voltage:" + voltageLevel + "V Percent: " + (batteryFraction * 100) + "%");
+    bleKeyboard.setBatteryLevel(batteryFraction);
 }
