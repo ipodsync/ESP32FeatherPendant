@@ -72,6 +72,8 @@ uint32_t button_mask = (1 << BUTTON_RIGHT) | (1 << BUTTON_DOWN) |
 QueueHandle_t buttonPressQueue;                      // Queue for notifying of button press changes
 SemaphoreHandle_t i2cSem = xSemaphoreCreateBinary(); // This semaphore is used to synchronize calls to I2C to prevent concurrent operations
 
+int currentSpeed = 4;
+
 // ISR that gets triggered when a button is pressed.
 void IRAM_ATTR onButtonPress()
 {
@@ -103,9 +105,7 @@ void buttonPressConsumer(void *)
             bleKeyboard.releaseAll();
 
             // Z Down
-            int oldV = lastValue & (1 << BUTTON_DOWN);
-            int newV = v & (1 << BUTTON_DOWN);
-            if (oldV != newV)
+            if (lastValue & (1 << BUTTON_DOWN) != v & (1 << BUTTON_DOWN))
             {
                 Serial.println("\tBUTTON_DOWN changed");
                 if (!(v & (1 << BUTTON_DOWN)))
@@ -121,9 +121,7 @@ void buttonPressConsumer(void *)
             }
 
             // Z Up
-            oldV = lastValue & (1 << BUTTON_UP);
-            newV = v & (1 << BUTTON_UP);
-            if (oldV != newV)
+            if (lastValue & (1 << BUTTON_UP) != v & (1 << BUTTON_UP))
             {
                 Serial.println("\tBUTTON_UP changed");
                 if (!(v & (1 << BUTTON_UP)))
@@ -139,38 +137,28 @@ void buttonPressConsumer(void *)
             }
 
             // Faster
-            oldV = lastValue & (1 << BUTTON_RIGHT);
-            newV = v & (1 << BUTTON_RIGHT);
-            if (oldV != newV)
+            if (lastValue & (1 << BUTTON_RIGHT) != v & (1 << BUTTON_RIGHT))
             {
                 // Serial.println("\tBUTTON_RIGHT changed");
                 if (!(v & (1 << BUTTON_RIGHT)))
                 {
                     Serial.println("\t\tBUTTON_RIGHT pressed");
+                    currentSpeed = 4;
                     bleKeyboard.print("4");
-                }
-                else
-                {
-                    // Serial.println("\t\tBUTTON_RIGHT released");
-                    // bleKeyboard.releaseAll(); // (KEY_NUM_4);
                 }
             }
 
             // Slow
-            oldV = lastValue & (1 << BUTTON_LEFT);
-            newV = v & (1 << BUTTON_LEFT);
-            if (oldV != newV)
+            if (lastValue & (1 << BUTTON_LEFT) != v & (1 << BUTTON_LEFT))
             {
-                // Serial.println("\tBUTTON_LEFT changed");
                 if (!(v & (1 << BUTTON_LEFT)))
                 {
+                    if (currentSpeed == 3)
+                        currentSpeed = 2;
+                    else
+                        currentSpeed = 3;
                     Serial.println("\t\tBUTTON_LEFT pressed");
-                    bleKeyboard.print("3");
-                }
-                else
-                {
-                    // Serial.println("\t\tBUTTON_LEFT");
-                    // bleKeyboard.releaseAll(); //(KEY_NUM_3);
+                    bleKeyboard.print(String(currentSpeed));
                 }
             }
 
@@ -314,9 +302,7 @@ void setup()
     {
         Serial.println("ERROR! seesaw not found");
         while (1)
-        {
             delay(1);
-        }
     }
 
     ss.pinModeBulk(button_mask, INPUT_PULLUP);
@@ -327,22 +313,12 @@ void setup()
     buttonPressQueue = xQueueCreate(10, sizeof(uint8_t));
 
     // Task for listening to button presses
-    xTaskCreate(
-        buttonPressConsumer,
-        "ButtonPressConsumer",
-        10000, // Stack size -- too low and ESP will eventually crash within the task
-        NULL,
-        1,
-        NULL);
+    xTaskCreate(buttonPressConsumer, "ButtonPressConsumer", 10000, // Stack size -- too low and ESP will eventually crash within the task
+                NULL, 1, NULL);
 
     // Task for reading the analog stick value
-    xTaskCreate(
-        analogStickTask,
-        "AnalogStickTask",
-        10000, // Stack size -- too low and ESP will eventually crash within the task
-        NULL,
-        2,
-        NULL);
+    xTaskCreate(analogStickTask, "AnalogStickTask", 10000, // Stack size -- too low and ESP will eventually crash within the task
+                NULL, 2, NULL);
 
     // Respond to changes from button presses
     attachInterrupt(IRQ_PIN, onButtonPress, FALLING);
