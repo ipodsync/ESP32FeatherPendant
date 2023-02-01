@@ -30,32 +30,18 @@ Adafruit_seesaw ss;
 // occur when the analog stick read task begins. Even after this calibration there may be some drift on the stick that can make determining
 // the center point error prone. In order to compensate for this, values can be specified to determine a reasonable center point. If you have
 // a use case where you don't care about drift or the center point of the stick, this can all be ignored entirely.
-#ifndef STICK_CENTER_POINT
 #define STICK_CENTER_POINT 512 // Analog stick will read 0...1024 along each axis
-#endif
-#ifndef STICK_L_CORRECTION
 #define STICK_L_CORRECTION -55
-#endif
-#ifndef STICK_R_CORRECTION
 #define STICK_R_CORRECTION 50
-#endif
-#ifndef STICK_U_CORRECTION
 #define STICK_U_CORRECTION 20
-#endif
-#ifndef STICK_D_CORRECTION
 #define STICK_D_CORRECTION -20
-#endif
 #define D_THRESHOLD 200;
 
 // Every time the analog values are read they will be slightly different. In order
 // to only detect movement when the stick is actually moved, these values can tune
 // the minimum amount of movement + or - before it is considered as moved.
-#ifndef MIN_STICK_H_MOVE
 #define MIN_STICK_H_MOVE 5
-#endif
-#ifndef MIN_STICK_V_MOVE
 #define MIN_STICK_V_MOVE 5
-#endif
 
 #define BUTTON_Z_UP BUTTON_1
 #define BUTTON_Z_DOWN BUTTON_2
@@ -97,15 +83,15 @@ void buttonPressConsumer(void *)
         xQueueReceive(buttonPressQueue, &p, portMAX_DELAY);
         xSemaphoreTake(i2cSem, portMAX_DELAY);
         uint32_t v = ss.digitalReadBulk(button_mask);
+        Serial.println("Buttons test");
 
         // Debounce by discarding duplicate reads
         if (lastValue != v)
         {
-            Serial.println("Buttons changed");
             bleKeyboard.releaseAll();
 
             // Z Down
-            if (lastValue & (1 << BUTTON_DOWN) != v & (1 << BUTTON_DOWN))
+            if ((lastValue & (1 << BUTTON_DOWN)) != (v & (1 << BUTTON_DOWN)))
             {
                 Serial.println("\tBUTTON_DOWN changed");
                 if (!(v & (1 << BUTTON_DOWN)))
@@ -121,7 +107,7 @@ void buttonPressConsumer(void *)
             }
 
             // Z Up
-            if (lastValue & (1 << BUTTON_UP) != v & (1 << BUTTON_UP))
+            if ((lastValue & (1 << BUTTON_UP)) != (v & (1 << BUTTON_UP)))
             {
                 Serial.println("\tBUTTON_UP changed");
                 if (!(v & (1 << BUTTON_UP)))
@@ -137,7 +123,7 @@ void buttonPressConsumer(void *)
             }
 
             // Faster
-            if (lastValue & (1 << BUTTON_RIGHT) != v & (1 << BUTTON_RIGHT))
+            if ((lastValue & (1 << BUTTON_RIGHT)) != (v & (1 << BUTTON_RIGHT)))
             {
                 // Serial.println("\tBUTTON_RIGHT changed");
                 if (!(v & (1 << BUTTON_RIGHT)))
@@ -149,7 +135,7 @@ void buttonPressConsumer(void *)
             }
 
             // Slow
-            if (lastValue & (1 << BUTTON_LEFT) != v & (1 << BUTTON_LEFT))
+            if ((lastValue & (1 << BUTTON_LEFT)) != (v & (1 << BUTTON_LEFT)))
             {
                 if (!(v & (1 << BUTTON_LEFT)))
                 {
@@ -164,7 +150,7 @@ void buttonPressConsumer(void *)
 
             lastValue = v;
         }
-
+        delay(100);
         xSemaphoreGive(i2cSem);
     }
 
@@ -237,9 +223,11 @@ void analogStickTask(void *)
             bool isDown = y > STICK_CENTER_POINT + D_THRESHOLD;
 
             // Log the position of the analog stick in various ways for different kinds of application
+            /*
             Serial.printf("Analog stick position change!\n\tIs centered: %s\n\tPosition: X=%d Y=%d\n",
                           isCentered ? "true" : "false",
                           x, y);
+                          */
 
             JoyPosition newPosition = Center;
             if (isCentered)
@@ -259,22 +247,22 @@ void analogStickTask(void *)
                 if (isLeft)
                 {
                     bleKeyboard.press(KEY_LEFT_ARROW);
-                    Serial.println("Left");
+                    // Serial.println("Left");
                 }
                 else if (isRight)
                 {
                     bleKeyboard.press(KEY_RIGHT_ARROW);
-                    Serial.println("Right");
+                    // Serial.println("Right");
                 }
                 else if (isUp)
                 {
                     bleKeyboard.press(KEY_UP_ARROW);
-                    Serial.println("Up");
+                    // Serial.println("Up");
                 }
                 else if (isDown)
                 {
                     bleKeyboard.press(KEY_DOWN_ARROW);
-                    Serial.println("Down");
+                    // Serial.println("Down");
                 }
                 else
                 {
